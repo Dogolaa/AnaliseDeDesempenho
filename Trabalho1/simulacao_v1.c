@@ -32,7 +32,7 @@ void inicia_little(medida_little * medidas){
     medidas->soma_area = 0.0;
 }
 
-void main(){
+int main(void){
     srand(time(NULL));
 
     medida_little E_N;
@@ -91,6 +91,18 @@ void main(){
 
     qtd_requisicoes++;
     soma_inter_requisicoes = proxima_requisicao;
+
+
+    FILE *arquivo_saida; 
+    arquivo_saida = fopen("relatorio_simulacao.csv", "w");
+
+
+    if (arquivo_saida == NULL) {
+        printf("Erro ao abrir o arquivo de saída!\n");
+        return 1; 
+    }
+
+    fprintf(arquivo_saida, "Tempo(s),E[N],E[W],ErroLittle\n");
 
     int proximo_ponto_relatorio = 10;
     
@@ -169,22 +181,20 @@ void main(){
             // Calcula as métricas com os valores ATUAIS
             double E_N_atual = E_N.soma_area / tempo_decorrido;
             double E_W_atual = 0.0;
-            double lambda_atual = 0.0;
             double erro_little_atual = 0.0;
             
-            // Proteção contra divisão por zero no início da simulação
             if (E_W_chegadas.qt_requisicoes > 0) {
                 E_W_atual = (E_W_chegadas.soma_area - E_W_saidas.soma_area) / E_W_chegadas.qt_requisicoes;
-                lambda_atual = E_W_chegadas.qt_requisicoes / tempo_decorrido;
+                double lambda_atual = E_W_chegadas.qt_requisicoes / tempo_decorrido;
                 erro_little_atual = E_N_atual - lambda_atual * E_W_atual;
             }
 
-            // Imprime o relatório para o ponto de parada atual
-            printf("\n---=== RELATÓRIO PARCIAL NO TEMPO ~%d s ===---\n", proximo_ponto_relatorio);
-            printf("E[N] %d: %lf\n", proximo_ponto_relatorio, E_N_atual);
-            printf("E[W] %d: %lf\n", proximo_ponto_relatorio, E_W_atual);
-            printf("Erro Little %d: %lf\n", proximo_ponto_relatorio, erro_little_atual);
-            printf("------------------------------------------------\n\n");
+            // Escreve os dados no arquivo em formato CSV
+            fprintf(arquivo_saida, "%d,%lf,%lf,%lf\n",
+                    proximo_ponto_relatorio,
+                    E_N_atual,
+                    E_W_atual,
+                    erro_little_atual);
 
             // Avança para o próximo ponto de relatório
             proximo_ponto_relatorio += 10;
@@ -220,5 +230,5 @@ void main(){
     printf("E[W]: %lF\n", E_W_final );
     printf("Erro Little: %lF\n", erro_little );
 
-
+    return 0;
 }
