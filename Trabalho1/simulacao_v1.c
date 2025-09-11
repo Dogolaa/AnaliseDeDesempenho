@@ -94,7 +94,7 @@ int main(void){
 
 
     FILE *arquivo_saida; 
-    arquivo_saida = fopen("relatorio_simulacao.csv", "w");
+    arquivo_saida = fopen("relatorio_simulacao_ocupacao80.csv", "w");
 
 
     if (arquivo_saida == NULL) {
@@ -179,6 +179,8 @@ int main(void){
 
         if (tempo_decorrido >= proximo_ponto_relatorio) {
             // Calcula as métricas com os valores ATUAIS
+            printf("==========Tempo decorrido=================");
+            printf("Tempo decorrido: %lF\n", tempo_decorrido);
             double E_N_atual = E_N.soma_area / tempo_decorrido;
             double E_W_atual = 0.0;
             double erro_little_atual = 0.0;
