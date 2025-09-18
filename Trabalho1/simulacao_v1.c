@@ -31,7 +31,6 @@ void inicia_little(medida_little * medidas){
     medidas->soma_area = 0.0;
 }
 
-// CORREÇÃO: Usar "int main(void)" é o padrão em C, em vez de "void main()"
 int main(void){
     srand(time(NULL));
 
@@ -47,19 +46,18 @@ int main(void){
     double media_inter_requisicoes;
     double media_tempo_servico;
     double proxima_requisicao;
-    // INICIALIZAÇÃO: Inicia tempo_servico com valor alto para não ser escolhido por engano
+
     double tempo_servico = tempo_simulacao * 2; 
 
     unsigned long int fila = 0;
     unsigned long int max_fila = 0;
 
     unsigned long int qtd_requisicoes = 0;
-    // INICIALIZAÇÃO: Boas práticas de inicializar a variável
+
     double soma_inter_requisicoes = 0.0; 
     unsigned long int qtd_servicos = 0;
     double soma_tempo_servico = 0.0;
     
-    // CORREÇÃO: Usar "%lf" para ler um double com scanf
     printf("Informe a media de tempo entre requisicoes: ");
     scanf("%lf", &media_inter_requisicoes);
     media_inter_requisicoes = 1.0/media_inter_requisicoes;
@@ -95,7 +93,6 @@ int main(void){
 
         // Identifica e processa o evento
         if(tempo_decorrido == proxima_requisicao){ // --- EVENTO DE CHEGADA ---
-            // Atualiza a área ANTES de mudar o estado (lógica original preservada)
             E_N.soma_area += (tempo_decorrido - E_N.tempo_anterior) * E_N.qt_requisicoes;
             E_W_chegadas.soma_area += (tempo_decorrido - E_W_chegadas.tempo_anterior) * E_W_chegadas.qt_requisicoes;
             
@@ -161,7 +158,7 @@ int main(void){
 
             // Salva no arquivo
             fprintf(arquivo_saida, "%.0f,%lu,%f,%f\n", tempo_decorrido, fila, E_N_atual, E_W_atual);
-            fflush(arquivo_saida); // Força a escrita no disco
+            fflush(arquivo_saida);
 
             // Agenda o próximo relatório
             proximo_ponto_relatorio += 10.0;
@@ -174,7 +171,6 @@ int main(void){
     E_W_saidas.soma_area += (tempo_decorrido - E_W_saidas.tempo_anterior) * E_W_saidas.qt_requisicoes;
 
     printf("\n---=== Métricas e Validações Finais ===---\n");
-    // CORREÇÃO: Usar "%f" para imprimir um double
     printf("max fila: %ld\n", max_fila);
     printf("media entre requisicoes: %f\n", soma_inter_requisicoes/qtd_requisicoes);
     printf("media tempos de sevico: %f\n", soma_tempo_servico/qtd_servicos);
@@ -190,9 +186,8 @@ int main(void){
 
     printf("E[N]: %f\n", E_N_final);
     printf("E[W]: %f\n", E_W_final);
-    // Usar %e para ver números muito pequenos (erros)
     printf("Erro Little: %e\n", erro_little);
 
-    fclose(arquivo_saida); // Fecha o arquivo
-    return 0; // Boa prática para int main
+    fclose(arquivo_saida);
+    return 0;
 }
