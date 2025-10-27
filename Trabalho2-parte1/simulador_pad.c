@@ -8,7 +8,7 @@
 
 /*
  * ===================================================================
- * ESTRUTURAS DE DADOS
+ * ESTRUTURAS DE DADOS (Sem alterações)
  * ===================================================================
  */
 typedef struct {
@@ -28,7 +28,7 @@ typedef struct {
 
 /*
  * ===================================================================
- * FUNÇÕES AUXILIARES
+ * FUNÇÕES AUXILIARES (Sem alterações)
  * ===================================================================
  */
 double aleatorio() {
@@ -81,13 +81,27 @@ int main(void){
     unsigned long int total_chegadas = 0;
     unsigned long int total_servicos_completos = 0;
     double soma_tempo_servico = 0.0;
+
+    /*
+     * ===================================================================
+     * NOVAS VARIÁVEIS PARA O CÁLCULO DO ATRASO MÉDIO (PAD)
+     * ===================================================================
+     */
+    double deltas[NUM_FILAS]; // Pesos (multiplicadores) de cada fila
+    unsigned long int T_j[NUM_FILAS] = {0}; // Total de chegadas na janela
+    double S_j[NUM_FILAS] = {0.0}; // Soma dos tempos de chegada dos que ESTÃO na fila
+    double D_j_dep[NUM_FILAS] = {0.0}; // Soma dos atrasos dos que JÁ SAÍRAM
+
+    // Variáveis de estado para o servidor
+    double tempo_chegada_em_atendimento;
+    int fila_em_atendimento = -1;
     
     /*
      * ===================================================================
      * COLETA DE PARÂMETROS DE ENTRADA
      * ===================================================================
      */
-    printf("---=== Simulador com Politica FCFS (O Mais Antigo) ===---\n");
+    printf("---=== Simulador com Politica PAD (Proportional Average Delay) ===---\n");
     for (int i = 0; i < NUM_FILAS; i++) {
         printf("Informe a taxa de chegada da Fila %d (reqs/segundo): ", i + 1);
         scanf("%lf", &media_inter_requisicoes[i]);
@@ -96,6 +110,14 @@ int main(void){
     scanf("%lf", &media_tempo_servico);
     printf("Informe o tamanho maximo para cada fila: ");
     scanf("%lu", &max_fila);
+
+    // Coleta dos novos pesos (deltas)
+    printf("\n--- Informe os pesos (deltas) para cada fila ---\n");
+    for (int i = 0; i < NUM_FILAS; i++) {
+        printf("Informe o delta (peso) da Fila %d: ", i + 1);
+        scanf("%lf", &deltas[i]);
+    }
+
 
     /*
      * ===================================================================
@@ -106,7 +128,7 @@ int main(void){
         proxima_requisicao[i] = exponencial(media_inter_requisicoes[i]);
     }
     
-    FILE *arquivo_saida = fopen("relatorio_fcfs.csv", "w");
+    FILE *arquivo_saida = fopen("relatorio_pad.csv", "w");
     if (arquivo_saida == NULL) {
         printf("Erro ao abrir o arquivo de saida!\n");
         return 1; 
@@ -155,6 +177,19 @@ int main(void){
         E_W_chegadas.tempo_anterior = tempo_decorrido;
         E_W_saidas.tempo_anterior = tempo_decorrido;
 
+
+        /*
+         * ===================================================================
+         * Bloco 3: PROCESSAMENTO DE EVENTOS
+         * ===================================================================
+         */
+
+        /*
+         * Evento de CHEGADA (tipo_evento de 0 a NUM_FILAS-1)
+         * - Apenas adiciona o cliente na fila e atualiza as estatísticas
+         * do PAD. O escalonador será chamado DEPOIS, se o servidor
+         * estiver livre.
+         */
         if(tipo_evento >= 0 && tipo_evento < NUM_FILAS) {
             int fila_idx = tipo_evento;
 
@@ -176,59 +211,37 @@ int main(void){
                 E_N.qt_requisicoes++;
                 E_W_chegadas.qt_requisicoes++;
 
-                if (!servidor_ocupado) {
-                    No* no_atendido = cabeca_fila[fila_idx];
-                    cabeca_fila[fila_idx] = no_atendido->proximo;
-                    if (cabeca_fila[fila_idx] == NULL) cauda_fila[fila_idx] = NULL;
-                    tamanho_fila[fila_idx]--;
-                    free(no_atendido);
-                    
-                    double duracao_servico = exponencial(media_tempo_servico);
-                    tempo_saida_servico = tempo_decorrido + duracao_servico;
-                    soma_tempo_servico += duracao_servico;
-                    servidor_ocupado = true;
-                }
+                // ATUALIZA ESTATÍSTICAS PAD (CHEGADA)
+                T_j[fila_idx]++; // Incrementa o total de itens da janela [cite: 16, 42]
+                S_j[fila_idx] += tempo_decorrido; // Soma o tempo de chegada [cite: 16, 42]
+
             } else {
                 perdas[fila_idx]++;
             }
             
             proxima_requisicao[fila_idx] = tempo_decorrido + exponencial(media_inter_requisicoes[fila_idx]);
 
+        /*
+         * Evento de SAÍDA (tipo_evento == 3)
+         * - Atualiza as estatísticas PAD do cliente que ACABOU de ser
+         * atendido e libera o servidor.
+         */
         } else if (tipo_evento == 3) {
             total_servicos_completos++;
             E_N.qt_requisicoes--;
             E_W_saidas.qt_requisicoes++;
+
+            // ATUALIZA ESTATÍSTICAS PAD (SAÍDA)
+            int fila_que_saiu = fila_em_atendimento;
+            double atraso = tempo_decorrido - tempo_chegada_em_atendimento;
+            D_j_dep[fila_que_saiu] += atraso; // Soma o atraso do cliente que saiu [cite: 69, 150]
             
-            int fila_a_servir = -1;
-            double menor_tempo_chegada = tempo_simulacao * 2;
+            servidor_ocupado = false;
+            fila_em_atendimento = -1;
 
-            for (int i = 0; i < NUM_FILAS; i++) {
-                if (cabeca_fila[i] != NULL) {
-                    if (cabeca_fila[i]->req.tempo_chegada < menor_tempo_chegada) {
-                        menor_tempo_chegada = cabeca_fila[i]->req.tempo_chegada;
-                        fila_a_servir = i;
-                    }
-                }
-            }
-
-            if (fila_a_servir != -1) {
-                No* no_atendido = cabeca_fila[fila_a_servir];
-                cabeca_fila[fila_a_servir] = no_atendido->proximo;
-                if (cabeca_fila[fila_a_servir] == NULL) {
-                    cauda_fila[fila_a_servir] = NULL;
-                }
-                tamanho_fila[fila_a_servir]--;
-                free(no_atendido);
-                
-                double duracao_servico = exponencial(media_tempo_servico);
-                tempo_saida_servico = tempo_decorrido + duracao_servico;
-                soma_tempo_servico += duracao_servico;
-                servidor_ocupado = true;
-            } else {
-                servidor_ocupado = false;
-                tempo_saida_servico = tempo_simulacao * 2;
-            }
-
+        /*
+         * Evento de RELATÓRIO (tipo_evento == 4)
+         */
         } else if (tipo_evento == 4) {
             double E_N_atual = E_N.soma_area / tempo_decorrido;
             double E_W_atual = 0.0;
@@ -244,6 +257,78 @@ int main(void){
             fflush(arquivo_saida);
 
             proximo_ponto_relatorio += 10.0;
+        }
+
+        /*
+         * ===================================================================
+         * Bloco 4: ESCALONADOR (Chamado se o servidor está livre)
+         * ===================================================================
+         * Após qualquer evento, se o servidor estiver ocioso, ele tenta
+         * puxar um novo cliente usando a política PAD.
+         */
+        if (!servidor_ocupado) {
+            int fila_a_servir = -1;
+            double max_prioridade = -1.0; // Usamos -1.0 pois prioridade (atraso) pode ser 0
+
+            // Itera em todas as filas para calcular a prioridade
+            for (int i = 0; i < NUM_FILAS; i++) {
+                if (tamanho_fila[i] > 0) { // Só podemos servir filas não-vazias
+                    
+                    // Coleta as variáveis para a fórmula
+                    double n = (double)tamanho_fila[i];
+                    double t = tempo_decorrido;
+                    double S = S_j[i];
+                    double D_dep = D_j_dep[i];
+                    double T = (double)T_j[i];
+                    double delta_val = deltas[i];
+                    
+                    double atraso_medio = 0.0;
+                    if (T > 0) {
+                        // Aplica a fórmula do atraso médio 
+                        atraso_medio = (n * t - S + D_dep) / T;
+                    }
+
+                    // A prioridade é o atraso médio ponderado
+                    double prioridade = delta_val * atraso_medio;
+
+                    if (prioridade > max_prioridade) {
+                        max_prioridade = prioridade;
+                        fila_a_servir = i;
+                    }
+                }
+            }
+
+            // Se o escalonador escolheu alguém...
+            if (fila_a_servir != -1) {
+                // Remove o cliente da cabeça da fila escolhida
+                No* no_atendido = cabeca_fila[fila_a_servir];
+                
+                // Salva os dados do cliente para a estatística de SAÍDA
+                tempo_chegada_em_atendimento = no_atendido->req.tempo_chegada;
+                fila_em_atendimento = fila_a_servir;
+
+                // ATUALIZA ESTATÍSTICAS PAD (INÍCIO DO SERVIÇO)
+                // Remove o tempo de chegada do cliente da soma S_j
+                S_j[fila_a_servir] -= tempo_chegada_em_atendimento;
+
+                // Remove o nó da lista ligada
+                cabeca_fila[fila_a_servir] = no_atendido->proximo;
+                if (cabeca_fila[fila_a_servir] == NULL) {
+                    cauda_fila[fila_a_servir] = NULL;
+                }
+                tamanho_fila[fila_a_servir]--;
+                free(no_atendido);
+                
+                // Agenda a SAÍDA (fim do serviço)
+                double duracao_servico = exponencial(media_tempo_servico);
+                tempo_saida_servico = tempo_decorrido + duracao_servico;
+                soma_tempo_servico += duracao_servico;
+                servidor_ocupado = true;
+            } else {
+                // Nenhuma fila tem clientes, servidor fica ocioso
+                servidor_ocupado = false;
+                tempo_saida_servico = tempo_simulacao * 2;
+            }
         }
     }
 

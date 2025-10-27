@@ -70,7 +70,7 @@ int main(void){
     qtd_requisicoes++;
     soma_inter_requisicoes = proxima_requisicao;
     
-    FILE *arquivo_saida = fopen("relatorio_simulacao999.csv", "w");
+    FILE *arquivo_saida = fopen("relatorio_simulacao90.csv", "w");
     if (arquivo_saida == NULL) {
         printf("Erro ao abrir o arquivo de saída!\n");
         return 1; 

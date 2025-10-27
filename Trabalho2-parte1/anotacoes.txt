@@ -1,0 +1,7 @@
+Waiting Time Priority - WTP - cabeça da fila.
+
+
+Media do tempo de atraso de dos que estao na fila, Proportinonal Avarage Delay - PAD, pega todos que chegou e calcula a Media
+nao pode calcular a media sempre que ficar livre, se nao fica leento, existe uma forma de calcular isso
+vai falar na quinta e mostrar um artigo sem ter que ficar varrendo a fila toda vez.
+

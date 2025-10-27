@@ -81,13 +81,15 @@ int main(void){
     unsigned long int total_chegadas = 0;
     unsigned long int total_servicos_completos = 0;
     double soma_tempo_servico = 0.0;
+
+    int ultima_fila_servida = -1; // Variável de estado para o Round Robin
     
     /*
      * ===================================================================
      * COLETA DE PARÂMETROS DE ENTRADA
      * ===================================================================
      */
-    printf("---=== Simulador com Politica FCFS (O Mais Antigo) ===---\n");
+    printf("---=== Simulador com Politica Round Robin ===---\n");
     for (int i = 0; i < NUM_FILAS; i++) {
         printf("Informe a taxa de chegada da Fila %d (reqs/segundo): ", i + 1);
         scanf("%lf", &media_inter_requisicoes[i]);
@@ -106,7 +108,7 @@ int main(void){
         proxima_requisicao[i] = exponencial(media_inter_requisicoes[i]);
     }
     
-    FILE *arquivo_saida = fopen("relatorio_fcfs.csv", "w");
+    FILE *arquivo_saida = fopen("relatorio_round_robin.csv", "w");
     if (arquivo_saida == NULL) {
         printf("Erro ao abrir o arquivo de saida!\n");
         return 1; 
@@ -200,18 +202,18 @@ int main(void){
             E_W_saidas.qt_requisicoes++;
             
             int fila_a_servir = -1;
-            double menor_tempo_chegada = tempo_simulacao * 2;
 
             for (int i = 0; i < NUM_FILAS; i++) {
-                if (cabeca_fila[i] != NULL) {
-                    if (cabeca_fila[i]->req.tempo_chegada < menor_tempo_chegada) {
-                        menor_tempo_chegada = cabeca_fila[i]->req.tempo_chegada;
-                        fila_a_servir = i;
-                    }
+                int fila_a_checar = (ultima_fila_servida + 1 + i) % NUM_FILAS;
+                if (tamanho_fila[fila_a_checar] > 0) {
+                    fila_a_servir = fila_a_checar;
+                    break;
                 }
             }
 
             if (fila_a_servir != -1) {
+                ultima_fila_servida = fila_a_servir;
+
                 No* no_atendido = cabeca_fila[fila_a_servir];
                 cabeca_fila[fila_a_servir] = no_atendido->proximo;
                 if (cabeca_fila[fila_a_servir] == NULL) {
