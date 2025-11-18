@@ -3,14 +3,14 @@
 #include<math.h>
 #include<time.h>
 #include<stdbool.h>
-#include<string.h> // Adicionado para strcpy e sprintf
+#include<string.h> 
 
 #define NUM_FILAS 3
-#define NUM_RUNS 4 // Quantidade de simulações (80, 90, 95, 99.9)
+#define NUM_RUNS 6 // 6 Cenários
 
 /*
  * ===================================================================
- * ESTRUTURAS DE DADOS (Sem alterações)
+ * ESTRUTURAS DE DADOS
  * ===================================================================
  */
 typedef struct {
@@ -30,7 +30,7 @@ typedef struct {
 
 /*
  * ===================================================================
- * FUNÇÕES AUXILIARES (Sem alterações)
+ * FUNÇÕES AUXILIARES
  * ===================================================================
  */
 double aleatorio() {
@@ -57,21 +57,25 @@ int main(void){
      * PARÂMETROS GLOBAIS DA SIMULAÇÃO
      * ===================================================================
      */
-    double ocupacoes[NUM_RUNS] = {0.80, 0.90, 0.95, 0.999};
-    char* labels[NUM_RUNS] = {"80", "90", "95", "99_9"};
+    char* nomes_cenarios[NUM_RUNS] = {
+        "1_Padrao_Balanceado", 
+        "2_Conflito_Interesses", 
+        "3_Buffers_Heterogeneos", 
+        "4_Cliente_Fantasma",
+        "5_Carga_Invertida",
+        "6_Gargalo_Critico"
+    };
     
     double deltas[NUM_FILAS] = {1.0, 2.0, 4.0};
-    unsigned long int max_fila = 1000;
-    double media_tempo_servico = 10.0; // 10 reqs/segundo
+    double media_tempo_servico = 10.0; 
     double tempo_simulacao = 86400.0;
     
-    printf("---=== Iniciando Bateria de Simulacoes (Politica PAD) ===---\n");
-    printf("Taxa de Servico (u): %.2f | Max Fila: %lu\n", media_tempo_servico, max_fila);
+    printf("---=== Bateria de 6 Cenários (Politica Prioridade por Acumulo - WTP/PAD) ===---\n");
     printf("Deltas: F1=%.1f, F2=%.1f, F3=%.1f\n", deltas[0], deltas[1], deltas[2]);
 
     /*
      * ===================================================================
-     * LAÇO PRINCIPAL DAS SIMULAÇÕES (executa uma vez por ocupação)
+     * LAÇO PRINCIPAL DAS SIMULAÇÕES (executa uma vez por cenário)
      * ===================================================================
      */
     for (int run = 0; run < NUM_RUNS; run++) {
@@ -105,32 +109,63 @@ int main(void){
         unsigned long int total_servicos_completos = 0;
         double soma_tempo_servico = 0.0;
 
-        unsigned long int T_j[NUM_FILAS] = {0};
-        double S_j[NUM_FILAS] = {0.0};
-        double D_j_dep[NUM_FILAS] = {0.0};
+        // Variável específica do PAD (Soma dos tempos de chegada na fila)
+        double S_j[NUM_FILAS] = {0.0}; 
 
-        double tempo_chegada_em_atendimento = 0.0;
-        int fila_em_atendimento = -1;
         double proximo_ponto_relatorio = 10.0;
 
         /*
          * ===================================================================
-         * Bloco 2: CONFIGURAÇÃO DOS PARÂMETROS DA RODADA
+         * Bloco 2: CONFIGURAÇÃO DOS PARÂMETROS DA RODADA (CENÁRIOS)
          * ===================================================================
          */
-        char nome_arquivo[100];
-        double ocupacao_atual = ocupacoes[run];
-        char* rho_label = labels[run];
-        double lambda_total = media_tempo_servico * ocupacao_atual;
-
-        media_inter_requisicoes[0] = lambda_total * (5.0 / 8.0);
-        media_inter_requisicoes[1] = lambda_total * (2.0 / 8.0);
-        media_inter_requisicoes[2] = lambda_total * (1.0 / 8.0);
+        unsigned long int max_filas[NUM_FILAS]; 
+        double lambda_total = media_tempo_servico * 0.999; // Base 99.9% ocupação
         
-        sprintf(nome_arquivo, "relatorio_pad_ocupacao_%s_pct.csv", rho_label);
+        if (run == 0) { // 1. Padrao Balanceado
+            media_inter_requisicoes[0] = lambda_total / 3.0;
+            media_inter_requisicoes[1] = lambda_total / 3.0;
+            media_inter_requisicoes[2] = lambda_total / 3.0;
+            max_filas[0] = 20; max_filas[1] = 20; max_filas[2] = 20;
+        } 
+        else if (run == 1) { // 2. Conflito de Interesses
+            media_inter_requisicoes[0] = lambda_total * 0.10;
+            media_inter_requisicoes[1] = lambda_total * 0.10;
+            media_inter_requisicoes[2] = lambda_total * 0.80; 
+            max_filas[0] = 20; max_filas[1] = 20; max_filas[2] = 20;
+        }
+        else if (run == 2) { // 3. Buffers Heterogeneos
+            media_inter_requisicoes[0] = lambda_total / 3.0;
+            media_inter_requisicoes[1] = lambda_total / 3.0;
+            media_inter_requisicoes[2] = lambda_total / 3.0;
+            max_filas[0] = 100; max_filas[1] = 20; max_filas[2] = 5; 
+        }
+        else if (run == 3) { // 4. Cliente Fantasma
+            media_inter_requisicoes[0] = lambda_total * 0.495;
+            media_inter_requisicoes[1] = lambda_total * 0.495;
+            media_inter_requisicoes[2] = lambda_total * 0.01; 
+            max_filas[0] = 20; max_filas[1] = 20; max_filas[2] = 20;
+        }
+        else if (run == 4) { // 5. Carga Invertida (Carga Alta na F1 Comum)
+            media_inter_requisicoes[0] = lambda_total * 0.80;
+            media_inter_requisicoes[1] = lambda_total * 0.10;
+            media_inter_requisicoes[2] = lambda_total * 0.10;
+            max_filas[0] = 20; max_filas[1] = 20; max_filas[2] = 20;
+        }
+        else if (run == 5) { // 6. Gargalo Crítico (Buffers Pequenos)
+            media_inter_requisicoes[0] = lambda_total / 3.0;
+            media_inter_requisicoes[1] = lambda_total / 3.0;
+            media_inter_requisicoes[2] = lambda_total / 3.0;
+            max_filas[0] = 5; max_filas[1] = 5; max_filas[2] = 5;
+        }
+        
+        char nome_arquivo[100];
+        sprintf(nome_arquivo, "relatorio_pad_cenario_%s.csv", nomes_cenarios[run]);
 
-        printf("\n---=== [RUN %d/%d] Iniciando: Ocupacao %s%% ===---\n", run + 1, NUM_RUNS, rho_label);
-        printf("   Arquivo: %s | Lambda Total: %.4f\n", nome_arquivo, lambda_total);
+        printf("\n---=== [CENARIO %d/6] %s ===---\n", run + 1, nomes_cenarios[run]);
+        printf("   Arquivo: %s\n", nome_arquivo);
+        printf("   Buffers: [%lu, %lu, %lu]\n", max_filas[0], max_filas[1], max_filas[2]);
+        printf("   Taxas: F1=%.2f, F2=%.2f, F3=%.2f\n", media_inter_requisicoes[0], media_inter_requisicoes[1], media_inter_requisicoes[2]);
 
         for (int i = 0; i < NUM_FILAS; i++) {
             proxima_requisicao[i] = exponencial(media_inter_requisicoes[i]);
@@ -141,12 +176,12 @@ int main(void){
             printf("Erro ao abrir o arquivo de saida: %s\n", nome_arquivo);
             return 1; 
         }
-        fprintf(arquivo_saida, "Tempo(s),Fila1,Fila2,Fila3,TotalSistema,ServidorOcupado,E[N],E[W]\n");
+        fprintf(arquivo_saida, "Tempo(s),Fila1,Fila2,Fila3,TotalSistema,ServidorOcupado,E[N],E[W],PerdasF1,PerdasF2,PerdasF3\n");
 
 
         /*
          * ===================================================================
-         * Bloco 3: MOTOR DE EVENTOS (idêntico ao código anterior)
+         * Bloco 3: MOTOR DE EVENTOS
          * ===================================================================
          */
         while(tempo_decorrido < tempo_simulacao){
@@ -187,14 +222,14 @@ int main(void){
 
             /*
              * ===================================================================
-             * Bloco 4: PROCESSAMENTO DE EVENTOS (idêntico ao código anterior)
+             * Bloco 4: PROCESSAMENTO DE EVENTOS
              * ===================================================================
              */
 
             if(tipo_evento >= 0 && tipo_evento < NUM_FILAS) {
                 int fila_idx = tipo_evento;
 
-                if (tamanho_fila[fila_idx] < max_fila) {
+                if (tamanho_fila[fila_idx] < max_filas[fila_idx]) {
                     No* novo_no = (No*) malloc(sizeof(No));
                     novo_no->req.tempo_chegada = tempo_decorrido;
                     novo_no->proximo = NULL;
@@ -212,8 +247,8 @@ int main(void){
                     E_N.qt_requisicoes++;
                     E_W_chegadas.qt_requisicoes++;
 
-                    T_j[fila_idx]++;
-                    S_j[fila_idx] += tempo_decorrido;
+                    // PAD: Atualiza S_j na chegada
+                    S_j[fila_idx] += tempo_decorrido; 
 
                 } else {
                     perdas[fila_idx]++;
@@ -225,13 +260,8 @@ int main(void){
                 total_servicos_completos++;
                 E_N.qt_requisicoes--;
                 E_W_saidas.qt_requisicoes++;
-
-                int fila_que_saiu = fila_em_atendimento;
-                double atraso = tempo_decorrido - tempo_chegada_em_atendimento;
-                D_j_dep[fila_que_saiu] += atraso;
                 
                 servidor_ocupado = false;
-                fila_em_atendimento = -1;
 
             } else if (tipo_evento == 4) {
                 double E_N_atual = E_N.soma_area / tempo_decorrido;
@@ -240,11 +270,12 @@ int main(void){
                     E_W_atual = (E_W_chegadas.soma_area - E_W_saidas.soma_area) / E_W_chegadas.qt_requisicoes;
                 }
 
-                fprintf(arquivo_saida, "%.0f,%lu,%lu,%lu,%lu,%d,%f,%f\n", 
+               fprintf(arquivo_saida, "%.0f,%lu,%lu,%lu,%lu,%d,%f,%f,%lu,%lu,%lu\n", 
                         tempo_decorrido, 
                         tamanho_fila[0], tamanho_fila[1], tamanho_fila[2], 
                         E_N.qt_requisicoes, 
-                        servidor_ocupado, E_N_atual, E_W_atual);
+                        servidor_ocupado, E_N_atual, E_W_atual,
+                        perdas[0], perdas[1], perdas[2]);
                 fflush(arquivo_saida);
 
                 proximo_ponto_relatorio += 10.0;
@@ -252,7 +283,7 @@ int main(void){
 
             /*
              * ===================================================================
-             * Bloco 5: ESCALONADOR PAD (idêntico ao código anterior)
+             * Bloco 5: ESCALONADOR PAD (Prioridade por Acúmulo)
              * ===================================================================
              */
             if (!servidor_ocupado) {
@@ -260,24 +291,19 @@ int main(void){
                 double max_prioridade = -1.0; 
 
                 for (int i = 0; i < NUM_FILAS; i++) {
-                    if (tamanho_fila[i] > 0) {
+                    if (tamanho_fila[i] > 0) { // Se a fila não está vazia
                         
-                        double n = (double)tamanho_fila[i];
+                        double n_j = (double)tamanho_fila[i];
                         double t = tempo_decorrido;
                         double S = S_j[i];
-                        double D_dep = D_j_dep[i];
-                        double T = (double)T_j[i];
                         double delta_val = deltas[i];
                         
-                        double atraso_medio = 0.0;
-                        if (T > 0) {
-                            atraso_medio = (n * t - S + D_dep) / T;
-                        }
-
-                        double prioridade = delta_val * atraso_medio;
-
-                        if (prioridade > max_prioridade) {
-                            max_prioridade = prioridade;
+                        // Prioridade = delta * (n*t - S)
+                        // (n*t - S) representa o atraso total acumulado pelos clientes na fila
+                        double prioridade_acumulada = delta_val * (n_j * t - S);
+                        
+                        if (prioridade_acumulada > max_prioridade) {
+                            max_prioridade = prioridade_acumulada;
                             fila_a_servir = i;
                         }
                     }
@@ -286,10 +312,8 @@ int main(void){
                 if (fila_a_servir != -1) {
                     No* no_atendido = cabeca_fila[fila_a_servir];
                     
-                    tempo_chegada_em_atendimento = no_atendido->req.tempo_chegada;
-                    fila_em_atendimento = fila_a_servir;
-
-                    S_j[fila_a_servir] -= tempo_chegada_em_atendimento;
+                    // PAD: Atualiza S_j na saída
+                    S_j[fila_a_servir] -= no_atendido->req.tempo_chegada;
 
                     cabeca_fila[fila_a_servir] = no_atendido->proximo;
                     if (cabeca_fila[fila_a_servir] == NULL) {
@@ -320,7 +344,7 @@ int main(void){
         E_W_chegadas.soma_area += delta_t * E_W_chegadas.qt_requisicoes;
         E_W_saidas.soma_area += delta_t * E_W_saidas.qt_requisicoes;
 
-        printf("---=== Simulacao Finalizada (Ocupacao %s%%) ===---\n", rho_label);
+        printf("---=== Simulacao Finalizada (%s) ===---\n", nomes_cenarios[run]);
         printf("   Tempo total de simulacao: %.2f segundos\n", tempo_decorrido);
         printf("   Total de chegadas ao sistema: %lu\n", total_chegadas);
         printf("   Total de servicos completos: %lu\n", total_servicos_completos);
@@ -328,11 +352,11 @@ int main(void){
             printf("   Clientes perdidos na Fila %d: %lu\n", i + 1, perdas[i]);
         }
 
-        printf("\n   --- Metricas de Desempenho (%s%%) ---\n", rho_label);
+        printf("\n   --- Metricas de Desempenho ---\n");
         double ocupacao_calculada = soma_tempo_servico / tempo_decorrido;
-        printf("   Ocupacao calculada do servidor: %f (Alvo: %.3f)\n", ocupacao_calculada, ocupacao_atual);
+        printf("   Ocupacao calculada do servidor: %f\n", ocupacao_calculada);
             
-        printf("\n   --- Lei de Little (%s%%) ---\n", rho_label);
+        printf("\n   --- Lei de Little ---\n");
         double E_N_final = E_N.soma_area / tempo_decorrido;
         double lambda_efetivo = (double)E_W_chegadas.qt_requisicoes / tempo_decorrido;
         double E_W_final = 0.0;
@@ -341,10 +365,7 @@ int main(void){
         }
         double erro_little = E_N_final - lambda_efetivo * E_W_final;  
 
-        printf("   E[N] (numero medio de clientes no sistema): %f\n", E_N_final);
-        printf("   E[W] (tempo medio do cliente no sistema): %f\n", E_W_final);
-        printf("   Lambda Efetivo (taxa de chegada real): %f\n", lambda_efetivo);
-        printf("   Erro numerico (Little): %e\n", erro_little);
+        printf("   E[N]: %f | E[W]: %f | Erro Little: %e\n", E_N_final, E_W_final, erro_little);
 
         fclose(arquivo_saida);
         
