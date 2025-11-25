@@ -3,7 +3,7 @@
 #include<math.h>
 #include<time.h>
 #include<stdbool.h>
-#include<string.h> 
+#include<string.h>
 
 #define NUM_FILAS 3
 #define NUM_RUNS 6 // 6 Cenários
@@ -66,12 +66,13 @@ int main(void){
         "6_Gargalo_Critico"
     };
     
-    double deltas[NUM_FILAS] = {1.0, 2.0, 4.0};
+    // Deltas mantidos, mas IGNORADOS na política de escalonamento.
+    double deltas[NUM_FILAS] = {1.0, 2.0, 4.0}; 
     double media_tempo_servico = 10.0; 
     double tempo_simulacao = 86400.0;
     
-    printf("---=== Bateria de 6 Cenários (Politica Prioridade por Acumulo - WTP/PAD) ===---\n");
-    printf("Deltas: F1=%.1f, F2=%.1f, F3=%.1f\n", deltas[0], deltas[1], deltas[2]);
+    printf("---=== Bateria de 6 Cenários (Politica Maximo Atraso Medio) ===---\n");
+    printf("Deltas: F1=%.1f, F2=%.1f, F3=%.1f (IGNORADOS)\n", deltas[0], deltas[1], deltas[2]);
 
     /*
      * ===================================================================
@@ -109,7 +110,7 @@ int main(void){
         unsigned long int total_servicos_completos = 0;
         double soma_tempo_servico = 0.0;
 
-        // Variável específica do PAD (Soma dos tempos de chegada na fila)
+        // Soma dos tempos de chegada na fila
         double S_j[NUM_FILAS] = {0.0}; 
 
         double proximo_ponto_relatorio = 10.0;
@@ -120,7 +121,7 @@ int main(void){
          * ===================================================================
          */
         unsigned long int max_filas[NUM_FILAS]; 
-        double lambda_total = media_tempo_servico * 0.999; // Base 99.9% ocupação
+        double lambda_total = media_tempo_servico * 0.999; 
         
         if (run == 0) { // 1. Padrao Balanceado
             media_inter_requisicoes[0] = lambda_total / 3.0;
@@ -146,13 +147,13 @@ int main(void){
             media_inter_requisicoes[2] = lambda_total * 0.01; 
             max_filas[0] = 20; max_filas[1] = 20; max_filas[2] = 20;
         }
-        else if (run == 4) { // 5. Carga Invertida (Carga Alta na F1 Comum)
+        else if (run == 4) { // 5. Carga Invertida
             media_inter_requisicoes[0] = lambda_total * 0.80;
             media_inter_requisicoes[1] = lambda_total * 0.10;
             media_inter_requisicoes[2] = lambda_total * 0.10;
             max_filas[0] = 20; max_filas[1] = 20; max_filas[2] = 20;
         }
-        else if (run == 5) { // 6. Gargalo Crítico (Buffers Pequenos)
+        else if (run == 5) { // 6. Gargalo Crítico
             media_inter_requisicoes[0] = lambda_total / 3.0;
             media_inter_requisicoes[1] = lambda_total / 3.0;
             media_inter_requisicoes[2] = lambda_total / 3.0;
@@ -160,7 +161,7 @@ int main(void){
         }
         
         char nome_arquivo[100];
-        sprintf(nome_arquivo, "relatorio_pad_cenario_%s.csv", nomes_cenarios[run]);
+        sprintf(nome_arquivo, "relatorio_maxw_cenario_%s.csv", nomes_cenarios[run]);
 
         printf("\n---=== [CENARIO %d/6] %s ===---\n", run + 1, nomes_cenarios[run]);
         printf("   Arquivo: %s\n", nome_arquivo);
@@ -247,7 +248,7 @@ int main(void){
                     E_N.qt_requisicoes++;
                     E_W_chegadas.qt_requisicoes++;
 
-                    // PAD: Atualiza S_j na chegada
+                    // Atualiza S_j na chegada (necessário para calcular o atraso médio)
                     S_j[fila_idx] += tempo_decorrido; 
 
                 } else {
@@ -283,9 +284,9 @@ int main(void){
 
             /*
              * ===================================================================
-             * Bloco 5: ESCALONADOR PAD (Baseado em Atraso Médio - Opção B)
+             * Bloco 5: ESCALONADOR (Máximo Atraso Médio)
              * ===================================================================
-             * Correção: Atraso Médio = (n_j * t - S_j) / n_j
+             * Regra: Escolhe a fila com o maior W_i (ignora deltas).
              */
             if (!servidor_ocupado) {
                 int fila_a_servir = -1;
@@ -297,16 +298,15 @@ int main(void){
                         double n_j = (double)tamanho_fila[i];
                         double t = tempo_decorrido;
                         double S = S_j[i];
-                        double delta_val = deltas[i];
                         
-                        // Calcula atraso total acumulado
+                        // 1. Calcula atraso total acumulado (N*t - S)
                         double atraso_total_acumulado = (n_j * t) - S;
                         
-                        // Calcula atraso MÉDIO dividindo pelo número de elementos
+                        // 2. Calcula atraso MÉDIO (W_i)
                         double atraso_medio = atraso_total_acumulado / n_j;
                         
-                        // Prioridade baseada na média ponderada
-                        double prioridade = delta_val * atraso_medio;
+                        // 3. A prioridade é o Atraso Médio puro (Max{W_i})
+                        double prioridade = atraso_medio; 
                         
                         if (prioridade > max_prioridade) {
                             max_prioridade = prioridade;
@@ -318,7 +318,7 @@ int main(void){
                 if (fila_a_servir != -1) {
                     No* no_atendido = cabeca_fila[fila_a_servir];
                     
-                    // PAD: Atualiza S_j na saída
+                    // Atualiza S_j na saída: S = S - tempo_chegada
                     S_j[fila_a_servir] -= no_atendido->req.tempo_chegada;
 
                     cabeca_fila[fila_a_servir] = no_atendido->proximo;
@@ -337,7 +337,7 @@ int main(void){
                     tempo_saida_servico = tempo_simulacao * 2;
                 }
             }
-        } // Fim do while
+        } // Fim do while(tempo_decorrido < tempo_simulacao)
 
         /*
          * ===================================================================
@@ -385,7 +385,7 @@ int main(void){
             }
         }
 
-    } // Fim do for
+    } // Fim do for (int run = 0; run < NUM_RUNS; run++)
 
     printf("\n---=== Bateria de Simulacoes Concluida ===---\n");
     return 0;
